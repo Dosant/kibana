@@ -127,15 +127,15 @@ export const ExpressionRendererImplementation = ({
       if (handlerRef.current) {
         handlerRef.current.destroy();
         handlerRef.current = null;
-        errorRenderHandlerRef.current = null;
       }
+      errorRenderHandlerRef.current = null;
     };
 
     /* eslint-disable react-hooks/exhaustive-deps */
   }, []);
   /* eslint-enable react-hooks/exhaustive-deps */
 
-  // call render's done when finished rendering custom layout state
+  // call expression loader's done() handler when finished rendering custom error state
   useLayoutEffect(() => {
     if (state.error && errorRenderHandlerRef.current) {
       hasHandledErrorRef.current = true;
