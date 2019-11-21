@@ -17,9 +17,9 @@
  * under the License.
  */
 
-import { render, ExpressionRenderHandler } from './render';
+import { ExpressionRenderHandler, render } from './render';
 import { Observable } from 'rxjs';
-import { Data, ExpressionRenderDefinition, IInterpreterRenderHandlers, RenderError } from './types';
+import { IInterpreterRenderHandlers, RenderError } from './types';
 import { getRenderersRegistry } from './services';
 import { first, take, toArray } from 'rxjs/operators';
 
