@@ -25,6 +25,7 @@ import { ExpressionRendererImplementation } from './expression_renderer';
 import { ExpressionLoader } from './loader';
 import { mount } from 'enzyme';
 import { EuiProgress } from '@elastic/eui';
+import { RenderErrorHandlerFnType } from './types';
 
 jest.mock('./loader', () => {
   return {
@@ -43,8 +44,6 @@ describe('ExpressionRenderer', () => {
     const render$ = renderSubject.asObservable().pipe(share());
     const loadingSubject = new Subject();
     const loading$ = loadingSubject.asObservable().pipe(share());
-    const errorSubject = new Subject();
-    const error$ = errorSubject.asObservable().pipe(share());
 
     (ExpressionLoader as jest.Mock).mockImplementation(() => {
       return {
@@ -52,7 +51,6 @@ describe('ExpressionRenderer', () => {
         data$,
         loading$,
         update: jest.fn(),
-        error$,
       };
     });
 
@@ -78,7 +76,6 @@ describe('ExpressionRenderer', () => {
     act(() => {
       loadingSubject.next();
     });
-
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(1);
@@ -90,69 +87,52 @@ describe('ExpressionRenderer', () => {
     expect(instance.find(EuiProgress)).toHaveLength(0);
   });
 
-  it('should display an error message when the expression fails', () => {
+  it('should display a custom error message if the user provides one and then remove it after successful render', () => {
     const dataSubject = new Subject();
     const data$ = dataSubject.asObservable().pipe(share());
     const renderSubject = new Subject();
     const render$ = renderSubject.asObservable().pipe(share());
     const loadingSubject = new Subject();
     const loading$ = loadingSubject.asObservable().pipe(share());
-    const errorSubject = new Subject();
-    const error$ = errorSubject.asObservable().pipe(share());
 
-    (ExpressionLoader as jest.Mock).mockImplementation(() => {
+    let onRenderError: RenderErrorHandlerFnType;
+    (ExpressionLoader as jest.Mock).mockImplementation((...args) => {
+      const params = args[2];
+      onRenderError = params.onRenderError;
       return {
         render$,
         data$,
         loading$,
         update: jest.fn(),
-        error$,
       };
     });
-
-    const instance = mount(<ExpressionRendererImplementation expression="" />);
-
-    act(() => {
-      dataSubject.next('good data');
-      errorSubject.next({ message: 'render error' });
-    });
-
-    instance.update();
-
-    expect(instance.find(EuiProgress)).toHaveLength(0);
-    expect(instance.find('[data-test-subj="expression-renderer-error"]')).toHaveLength(1);
-  });
-
-  it('should display a custom error message if the user provides one', () => {
-    const dataSubject = new Subject();
-    const data$ = dataSubject.asObservable().pipe(share());
-    const renderSubject = new Subject();
-    const render$ = renderSubject.asObservable().pipe(share());
-    const loadingSubject = new Subject();
-    const loading$ = loadingSubject.asObservable().pipe(share());
-    const errorSubject = new Subject();
-    const error$ = errorSubject.asObservable().pipe(share());
-
-    (ExpressionLoader as jest.Mock).mockImplementation(() => {
-      return {
-        render$,
-        data$,
-        loading$,
-        update: jest.fn(),
-        error$,
-      };
-    });
-
-    const renderErrorFn = jest.fn().mockReturnValue(null);
 
     const instance = mount(
-      <ExpressionRendererImplementation expression="" renderError={renderErrorFn} />
+      <ExpressionRendererImplementation
+        expression=""
+        renderError={message => <div data-test-subj={'custom-error'}>{message}</div>}
+      />
     );
+
     act(() => {
-      errorSubject.next({ message: 'render error' });
+      onRenderError!(instance.getDOMNode(), new Error('render error'), {
+        done: () => {
+          renderSubject.next(1);
+        },
+      } as any);
+    });
+
+    instance.update();
+    expect(instance.find(EuiProgress)).toHaveLength(0);
+    expect(instance.find('[data-test-subj="custom-error"]')).toHaveLength(1);
+    expect(instance.find('[data-test-subj="custom-error"]').contains('render error')).toBeTruthy();
+
+    act(() => {
+      loadingSubject.next();
+      renderSubject.next(2);
     });
     instance.update();
-
-    expect(renderErrorFn).toHaveBeenCalledWith('render error');
+    expect(instance.find(EuiProgress)).toHaveLength(0);
+    expect(instance.find('[data-test-subj="custom-error"]')).toHaveLength(0);
   });
 });
