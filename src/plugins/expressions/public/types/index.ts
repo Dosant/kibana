@@ -59,8 +59,7 @@ export interface IExpressionLoaderParams {
   customRenderers?: [];
   extraHandlers?: Record<string, any>;
   inspectorAdapters?: Adapters;
-  useErrorRenderer?: boolean;
-  customErrorRenderer?: ExpressionRenderDefinition;
+  onRenderError?: RenderErrorHandlerFnType;
 }
 
 export interface IInterpreterHandlers {
@@ -104,3 +103,13 @@ export interface IInterpreterSuccessResult {
 export type IInterpreterResult = IInterpreterSuccessResult & IInterpreterErrorResult;
 
 export { ExpressionRenderDefinition };
+
+export interface RenderError extends Error {
+  type?: string;
+}
+
+export type RenderErrorHandlerFnType = (
+  domNode: HTMLElement,
+  error: RenderError,
+  handlers: IInterpreterRenderHandlers
+) => void;

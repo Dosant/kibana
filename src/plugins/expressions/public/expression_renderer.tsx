@@ -20,12 +20,12 @@
 import { useRef, useEffect, useState } from 'react';
 import React from 'react';
 import classNames from 'classnames';
+import { filter } from 'rxjs/operators';
 import { EuiLoadingChart, EuiProgress } from '@elastic/eui';
 import theme from '@elastic/eui/dist/eui_theme_light.json';
-import { IExpressionLoaderParams } from './types';
+import { IExpressionLoaderParams, RenderError } from './types';
 import { ExpressionAST } from '../common/types';
 import { ExpressionLoader } from './loader';
-import { RenderError } from './render';
 
 // Accept all options of the runner as props except for the
 // dom element which is provided by the component itself
@@ -78,6 +78,9 @@ export const ExpressionRendererImplementation = ({
   ]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
+  // flag to skip next render$ notification,
+  // because of just handled error
+  const hasHandledError = useRef(false);
   // Initialize the loader only once
   useEffect(() => {
     if (mountpoint.current && !handlerRef.current) {
@@ -85,33 +88,36 @@ export const ExpressionRendererImplementation = ({
         ...options,
         // react component wrapper provides different
         // error handling api which is easier to work with from react
-        useErrorRenderer: false,
+        onRenderError: (domNode, error, handlers) => {
+          if (!handlerRef.current) {
+            handlers.done();
+            return;
+          }
+          setState(() => ({
+            ...defaultState,
+            isEmpty: false,
+            error,
+          }));
+          hasHandledError.current = true;
+          handlers.done(); // TODO: track actual dom update?
+        },
       });
 
       handlerRef.current.loading$.subscribe(() => {
         if (!handlerRef.current) {
           return;
         }
+        hasHandledError.current = false;
         setState(prevState => ({ ...prevState, isLoading: true }));
       });
-      handlerRef.current.render$.subscribe(item => {
+      handlerRef.current.render$.pipe(filter(() => !hasHandledError.current)).subscribe(item => {
         if (!handlerRef.current) {
           return;
         }
+
         setState(() => ({
           ...defaultState,
           isEmpty: false,
-          error: null,
-        }));
-      });
-      handlerRef.current.error$.subscribe(error => {
-        if (!handlerRef.current) {
-          return;
-        }
-        setState(() => ({
-          ...defaultState,
-          isEmpty: false,
-          error,
         }));
       });
     }

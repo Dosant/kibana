@@ -25,28 +25,22 @@ import {
   RenderId,
   Data,
   IInterpreterRenderHandlers,
-  ExpressionRenderDefinition,
+  RenderErrorHandlerFnType,
+  RenderError,
 } from './types';
 import { getRenderersRegistry } from './services';
-import { errorRenderer as defaultErrorRenderer } from './error_renderer';
+import { renderErrorHandler as defaultRenderErrorHandler } from './render_error_handler';
 
 export type IExpressionRendererExtraHandlers = Record<string, any>;
 
 export interface ExpressionRenderHandlerParams {
-  useErrorRenderer: boolean;
-  customErrorRenderer: ExpressionRenderDefinition;
-}
-
-export interface RenderError {
-  type?: string;
-  message: string;
+  onRenderError: RenderErrorHandlerFnType;
 }
 
 export class ExpressionRenderHandler {
   render$: Observable<RenderId>;
   update$: Observable<any>;
   events$: Observable<event>;
-  error$: Observable<RenderError>;
 
   private element: HTMLElement;
   private destroyFn?: any;
@@ -54,31 +48,25 @@ export class ExpressionRenderHandler {
   private renderSubject: Rx.BehaviorSubject<RenderId | null>;
   private eventsSubject: Rx.Subject<unknown>;
   private updateSubject: Rx.Subject<unknown>;
-  private errorSubject: Rx.BehaviorSubject<RenderError | null>;
   private handlers: IInterpreterRenderHandlers;
-  private errorRenderer: ExpressionRenderDefinition | null;
+  private onRenderError: RenderErrorHandlerFnType;
 
   constructor(
     element: HTMLElement,
-    { useErrorRenderer = true, customErrorRenderer }: Partial<ExpressionRenderHandlerParams> = {}
+    { onRenderError }: Partial<ExpressionRenderHandlerParams> = {}
   ) {
     this.element = element;
 
     this.eventsSubject = new Rx.Subject();
     this.events$ = this.eventsSubject.asObservable().pipe(share());
-    this.errorRenderer = useErrorRenderer ? customErrorRenderer || defaultErrorRenderer : null;
+
+    this.onRenderError = onRenderError || defaultRenderErrorHandler;
 
     this.renderSubject = new Rx.BehaviorSubject(null as RenderId | null);
     this.render$ = this.renderSubject.asObservable().pipe(
       share(),
       filter(_ => _ !== null)
     ) as Observable<RenderId>;
-
-    this.errorSubject = new Rx.BehaviorSubject(null as RenderError | null);
-    this.error$ = this.errorSubject.asObservable().pipe(
-      share(),
-      filter(_ => _ !== null)
-    ) as Observable<RenderError>;
 
     this.updateSubject = new Rx.Subject();
     this.update$ = this.updateSubject.asObservable().pipe(share());
@@ -105,23 +93,21 @@ export class ExpressionRenderHandler {
 
   render = async (data: Data, extraHandlers: IExpressionRendererExtraHandlers = {}) => {
     if (!data || typeof data !== 'object') {
-      return this.handleRenderError({
-        message: 'invalid data provided to the expression renderer',
-      });
+      return this.handleRenderError(new Error('invalid data provided to the expression renderer'));
     }
 
     if (data.type !== 'render' || !data.as) {
       if (data.type === 'error') {
         return this.handleRenderError(data.error);
       } else {
-        return this.handleRenderError({
-          message: 'invalid data provided to the expression renderer',
-        });
+        return this.handleRenderError(
+          new Error('invalid data provided to the expression renderer')
+        );
       }
     }
 
     if (!getRenderersRegistry().get(data.as)) {
-      return this.handleRenderError({ message: `invalid renderer id '${data.as}'` });
+      return this.handleRenderError(new Error(`invalid renderer id '${data.as}'`));
     }
 
     try {
@@ -130,7 +116,7 @@ export class ExpressionRenderHandler {
         .get(data.as)!
         .render(this.element, data.value, { ...this.handlers, ...extraHandlers });
     } catch (e) {
-      return this.handleRenderError({ type: e.type, message: e.message });
+      return this.handleRenderError(e);
     }
   };
 
@@ -138,7 +124,6 @@ export class ExpressionRenderHandler {
     this.renderSubject.complete();
     this.eventsSubject.complete();
     this.updateSubject.complete();
-    this.errorSubject.complete();
     if (this.destroyFn) {
       this.destroyFn();
     }
@@ -148,12 +133,8 @@ export class ExpressionRenderHandler {
     return this.element;
   };
 
-  handleRenderError = async (error: RenderError) => {
-    this.errorSubject.next(error);
-
-    if (this.errorRenderer) {
-      await this.errorRenderer.render(this.element, { type: 'error', error }, this.handlers);
-    }
+  handleRenderError = (error: RenderError) => {
+    this.onRenderError(this.element, error, this.handlers);
   };
 }
 

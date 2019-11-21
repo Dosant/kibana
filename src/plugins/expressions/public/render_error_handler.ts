@@ -18,20 +18,19 @@
  */
 
 import { i18n } from '@kbn/i18n';
-import { Data, ExpressionRenderDefinition, IInterpreterRenderHandlers } from './types';
+import { RenderErrorHandlerFnType, IInterpreterRenderHandlers, RenderError } from './types';
 import { getNotifications } from './services';
 
-export const errorRenderer: ExpressionRenderDefinition = {
-  name: 'error_renderer',
-  displayName: 'error renderer',
-  reuseDomNode: true,
-  render: async (element: HTMLElement, data: Data, handlers: IInterpreterRenderHandlers) => {
-    getNotifications().toasts.addError(data.error, {
-      title: i18n.translate('expressions.defaultErrorRenderer.errorTitle', {
-        defaultMessage: 'Error in visualisation',
-      }),
-      toastMessage: data.error.message,
-    });
-    handlers.done();
-  },
+export const renderErrorHandler: RenderErrorHandlerFnType = (
+  element: HTMLElement,
+  error: RenderError,
+  handlers: IInterpreterRenderHandlers
+) => {
+  getNotifications().toasts.addError(error, {
+    title: i18n.translate('expressions.defaultErrorRenderer.errorTitle', {
+      defaultMessage: 'Error in visualisation',
+    }),
+    toastMessage: error.message,
+  });
+  handlers.done();
 };
