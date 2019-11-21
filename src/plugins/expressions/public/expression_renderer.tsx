@@ -97,6 +97,7 @@ export const ExpressionRendererImplementation = ({
       // react component wrapper provides different
       // error handling api which is easier to work with from react
       // if custom renderError is not provided then we fallback to default error handling from ExpressionLoader
+      // TODO: track renderError prop change as dep?
       onRenderError:
         renderError &&
         ((domNode, error, handlers) => {
