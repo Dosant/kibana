@@ -31,6 +31,7 @@ export class ExpressionLoader {
   update$: ExpressionRenderHandler['update$'];
   render$: ExpressionRenderHandler['render$'];
   events$: ExpressionRenderHandler['events$'];
+  error$: ExpressionRenderHandler['error$'];
   loading$: Observable<void>;
 
   private dataHandler: ExpressionDataHandler | undefined;
@@ -51,10 +52,14 @@ export class ExpressionLoader {
     this.loadingSubject = new Subject();
     this.loading$ = this.loadingSubject.asObservable().pipe(share());
 
-    this.renderHandler = new ExpressionRenderHandler(element);
+    this.renderHandler = new ExpressionRenderHandler(element, {
+      useErrorRenderer: params && params.useErrorRenderer,
+      customErrorRenderer: params && params.customErrorRenderer,
+    });
     this.render$ = this.renderHandler.render$;
     this.update$ = this.renderHandler.update$;
     this.events$ = this.renderHandler.events$;
+    this.error$ = this.renderHandler.error$;
 
     this.update$.subscribe(({ newExpression, newParams }) => {
       this.update(newExpression, newParams);

@@ -25,6 +25,7 @@ import theme from '@elastic/eui/dist/eui_theme_light.json';
 import { IExpressionLoaderParams } from './types';
 import { ExpressionAST } from '../common/types';
 import { ExpressionLoader } from './loader';
+import { RenderError } from './render';
 
 // Accept all options of the runner as props except for the
 // dom element which is provided by the component itself
@@ -39,7 +40,7 @@ export interface ExpressionRendererProps extends IExpressionLoaderParams {
 interface State {
   isEmpty: boolean;
   isLoading: boolean;
-  error: null | { message: string };
+  error: null | RenderError;
 }
 
 export type ExpressionRenderer = React.FC<ExpressionRendererProps>;
@@ -80,7 +81,12 @@ export const ExpressionRendererImplementation = ({
   // Initialize the loader only once
   useEffect(() => {
     if (mountpoint.current && !handlerRef.current) {
-      handlerRef.current = new ExpressionLoader(mountpoint.current, expression, options);
+      handlerRef.current = new ExpressionLoader(mountpoint.current, expression, {
+        ...options,
+        // react component wrapper provides different
+        // error handling api which is easier to work with from react
+        useErrorRenderer: false,
+      });
 
       handlerRef.current.loading$.subscribe(() => {
         if (!handlerRef.current) {
@@ -92,22 +98,25 @@ export const ExpressionRendererImplementation = ({
         if (!handlerRef.current) {
           return;
         }
-        if (typeof item !== 'number') {
-          setState(() => ({
-            ...defaultState,
-            isEmpty: false,
-            error: item.error,
-          }));
-        } else {
-          setState(() => ({
-            ...defaultState,
-            isEmpty: false,
-          }));
+        setState(() => ({
+          ...defaultState,
+          isEmpty: false,
+          error: null,
+        }));
+      });
+      handlerRef.current.error$.subscribe(error => {
+        if (!handlerRef.current) {
+          return;
         }
+        setState(() => ({
+          ...defaultState,
+          isEmpty: false,
+          error,
+        }));
       });
     }
-  /* eslint-disable */
-  // TODO: Replace mountpoint.current by something else.
+    /* eslint-disable */
+    // TODO: Replace mountpoint.current by something else.
   }, [mountpoint.current]);
   /* eslint-enable */
 

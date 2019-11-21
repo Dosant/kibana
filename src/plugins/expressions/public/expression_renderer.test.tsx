@@ -18,6 +18,7 @@
  */
 
 import React from 'react';
+import { act } from 'react-dom/test-utils';
 import { Subject } from 'rxjs';
 import { share } from 'rxjs/operators';
 import { ExpressionRendererImplementation } from './expression_renderer';
@@ -42,6 +43,8 @@ describe('ExpressionRenderer', () => {
     const render$ = renderSubject.asObservable().pipe(share());
     const loadingSubject = new Subject();
     const loading$ = loadingSubject.asObservable().pipe(share());
+    const errorSubject = new Subject();
+    const error$ = errorSubject.asObservable().pipe(share());
 
     (ExpressionLoader as jest.Mock).mockImplementation(() => {
       return {
@@ -49,29 +52,39 @@ describe('ExpressionRenderer', () => {
         data$,
         loading$,
         update: jest.fn(),
+        error$,
       };
     });
 
     const instance = mount(<ExpressionRendererImplementation expression="" />);
 
-    loadingSubject.next();
+    act(() => {
+      loadingSubject.next();
+    });
+
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(1);
 
-    renderSubject.next(1);
+    act(() => {
+      renderSubject.next(1);
+    });
 
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(0);
 
     instance.setProps({ expression: 'something new' });
-    loadingSubject.next();
+    act(() => {
+      loadingSubject.next();
+    });
+
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(1);
-
-    renderSubject.next(1);
+    act(() => {
+      renderSubject.next(1);
+    });
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(0);
@@ -84,6 +97,8 @@ describe('ExpressionRenderer', () => {
     const render$ = renderSubject.asObservable().pipe(share());
     const loadingSubject = new Subject();
     const loading$ = loadingSubject.asObservable().pipe(share());
+    const errorSubject = new Subject();
+    const error$ = errorSubject.asObservable().pipe(share());
 
     (ExpressionLoader as jest.Mock).mockImplementation(() => {
       return {
@@ -91,16 +106,17 @@ describe('ExpressionRenderer', () => {
         data$,
         loading$,
         update: jest.fn(),
+        error$,
       };
     });
 
     const instance = mount(<ExpressionRendererImplementation expression="" />);
 
-    dataSubject.next('good data');
-    renderSubject.next({
-      type: 'error',
-      error: { message: 'render error' },
+    act(() => {
+      dataSubject.next('good data');
+      errorSubject.next({ message: 'render error' });
     });
+
     instance.update();
 
     expect(instance.find(EuiProgress)).toHaveLength(0);
@@ -114,6 +130,8 @@ describe('ExpressionRenderer', () => {
     const render$ = renderSubject.asObservable().pipe(share());
     const loadingSubject = new Subject();
     const loading$ = loadingSubject.asObservable().pipe(share());
+    const errorSubject = new Subject();
+    const error$ = errorSubject.asObservable().pipe(share());
 
     (ExpressionLoader as jest.Mock).mockImplementation(() => {
       return {
@@ -121,6 +139,7 @@ describe('ExpressionRenderer', () => {
         data$,
         loading$,
         update: jest.fn(),
+        error$,
       };
     });
 
@@ -129,10 +148,8 @@ describe('ExpressionRenderer', () => {
     const instance = mount(
       <ExpressionRendererImplementation expression="" renderError={renderErrorFn} />
     );
-
-    renderSubject.next({
-      type: 'error',
-      error: { message: 'render error' },
+    act(() => {
+      errorSubject.next({ message: 'render error' });
     });
     instance.update();
 
