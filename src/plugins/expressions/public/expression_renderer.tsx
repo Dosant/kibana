@@ -24,6 +24,7 @@ import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { EuiLoadingChart, EuiProgress } from '@elastic/eui';
 import theme from '@elastic/eui/dist/eui_theme_light.json';
+import { useShallowCompareEffect } from '../../kibana_react/public';
 import { IExpressionLoaderParams, IInterpreterRenderHandlers, RenderError } from './types';
 import { ExpressionAST } from '../common/types';
 import { ExpressionLoader } from './loader';
@@ -169,45 +170,3 @@ export const ExpressionRendererImplementation = ({
     </div>
   );
 };
-
-function useShallowCompareEffect(callback: React.EffectCallback, deps: React.DependencyList) {
-  useEffect(callback, useShallowCompareMemoize(deps));
-}
-function useShallowCompareMemoize(deps: React.DependencyList) {
-  const ref = useRef<React.DependencyList | undefined>(undefined);
-
-  if (!ref.current || !deps.some((dep, index) => shallowEqual(dep, ref.current![index]))) {
-    ref.current = deps;
-  }
-
-  return ref.current;
-}
-function shallowEqual(objA: any, objB: any): boolean {
-  // TODO: Object.is polyfill IE11
-  if (Object.is(objA, objB)) {
-    return true;
-  }
-
-  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
-    return false;
-  }
-
-  const keysA = Object.keys(objA);
-  const keysB = Object.keys(objB);
-
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-
-  // Test for A's keys different from B.
-  for (let i = 0; i < keysA.length; i++) {
-    if (
-      !Object.prototype.hasOwnProperty.call(objB, keysA[i]) ||
-      !Object.is(objA[keysA[i]], objB[keysA[i]])
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
