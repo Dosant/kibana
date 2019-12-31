@@ -404,7 +404,6 @@ uiModules
     });
 
     $scope.$on('$destroy', () => {
-      debugger;
       destroyIndexedFieldsTable();
       destroyScriptedFieldsTable();
       destroySourceFiltersTable();
