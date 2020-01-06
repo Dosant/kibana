@@ -31,6 +31,7 @@ import {
   fieldWildcardMatcher,
   createStateContainer,
   syncState,
+  createKbnUrlSyncStrategy,
 } from '../../../../../../../../plugins/kibana_utils/public';
 import { setup as managementSetup } from '../../../../../../management/public/legacy';
 import React from 'react';
@@ -203,9 +204,14 @@ uiModules
     AppState,
     confirmModal
   ) {
+    const syncStrategy = createKbnUrlSyncStrategy({
+      useHash: config.get('state:storeInSessionStorage'),
+    });
+    const initialStateFromUrl = syncStrategy.fromStorage('_a');
     const $state = createStateContainer(
       {
         tab: TAB_INDEXED_FIELDS,
+        ...initialStateFromUrl,
       },
       {
         changeTab: state => tab => ({ ...state, tab }),
@@ -231,13 +237,16 @@ uiModules
 
     handleTabChange($scope, $state.selectors.tab());
 
-    const [startSyncingState, stopSyncingState] = syncState({
-      syncKey: '_a',
-      stateContainer: $state,
-    });
-    unsubscribe.push(stopSyncingState);
     $scope.$$postDigest(() => {
-      startSyncingState();
+      const { stop } = syncState({
+        syncKey: '_a',
+        stateContainer: {
+          ...$state,
+          set: state => $state.set({ tab: TAB_INDEXED_FIELDS, ...state }), // make sure transition to default state is handled
+        },
+        syncStrategy,
+      });
+      unsubscribe.push(stop);
     });
 
     $scope.fieldWildcardMatcher = (...args) =>
