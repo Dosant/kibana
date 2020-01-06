@@ -229,16 +229,14 @@ uiModules
     unsubscribe.push(
       $state.subscribe(({ tab }) => {
         handleTabChange($scope, tab);
-        if ($scope.$$phase !== '$apply' && $scope.$$phase !== '$digest') {
-          $scope.$apply();
-        }
+        $scope.$applyAsync();
       })
     );
 
     handleTabChange($scope, $state.selectors.tab());
 
     $scope.$$postDigest(() => {
-      const { stop } = syncState({
+      const { start, stop } = syncState({
         syncKey: '_a',
         stateContainer: {
           ...$state,
@@ -246,6 +244,7 @@ uiModules
         },
         syncStrategy,
       });
+      start();
       unsubscribe.push(stop);
     });
 
