@@ -207,7 +207,8 @@ uiModules
     const syncStrategy = createKbnUrlSyncStrategy({
       useHash: config.get('state:storeInSessionStorage'),
     });
-    const initialStateFromUrl = syncStrategy.fromStorage('_a');
+    const stateSyncKey = '_a';
+    const initialStateFromUrl = syncStrategy.fromStorage(stateSyncKey);
     const $state = createStateContainer(
       {
         tab: TAB_INDEXED_FIELDS,
@@ -220,6 +221,7 @@ uiModules
         tab: state => () => state.tab,
       }
     );
+    syncStrategy.toStorage(stateSyncKey, $state.get(), { replace: true }); // make sure initial state is in sync with default state
     Object.assign($scope, {
       get state() {
         return $state.getState();
@@ -237,7 +239,7 @@ uiModules
 
     $scope.$$postDigest(() => {
       const { start, stop } = syncState({
-        syncKey: '_a',
+        syncKey: stateSyncKey,
         stateContainer: {
           ...$state,
           set: state => $state.set({ tab: TAB_INDEXED_FIELDS, ...state }), // make sure transition to default state is handled
