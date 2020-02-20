@@ -41,6 +41,7 @@ import {
   QueryState,
   Filter,
   esFilters,
+  Query,
 } from '../../../../../src/plugins/data/public';
 import {
   BaseState,
@@ -65,8 +66,7 @@ interface StateDemoAppDeps {
 interface AppState {
   name: string;
   filters: Filter[];
-  // TODO: https://github.com/elastic/kibana/issues/58111
-  // query?: Query;
+  query?: Query;
 }
 const defaultAppState: AppState = {
   name: '',
@@ -92,15 +92,6 @@ const App = ({
   useGlobalStateSyncing(data.query, kbnUrlStateStorage);
   useAppStateSyncing(appStateContainer, data.query, kbnUrlStateStorage);
 
-  // TODO: https://github.com/elastic/kibana/issues/58111
-  // useEffect indefinite cycle inside TopNavManu
-  // const onQuerySubmit = useCallback(
-  //   ({ query }) => {
-  //     appStateContainer.set({ ...appState, query });
-  //   },
-  //   [appStateContainer, appState]
-  // );
-
   const indexPattern = useIndexPattern(data);
   if (!indexPattern) return <div>Loading...</div>;
 
@@ -115,9 +106,12 @@ const App = ({
             showSearchBar={true}
             indexPatterns={[indexPattern]}
             useDefaultBehaviors={true}
-            // TODO: https://github.com/elastic/kibana/issues/58111
-            // onQuerySubmit={onQuerySubmit}
-            // query={appState.query}
+            onQuerySubmit={({ query }) => {
+              if (query) {
+                appStateContainer.set({ ...appStateContainer.get(), query });
+              }
+            }}
+            query={appState.query}
           />
           <EuiPage restrictWidth="1000px">
             <EuiPageBody>
