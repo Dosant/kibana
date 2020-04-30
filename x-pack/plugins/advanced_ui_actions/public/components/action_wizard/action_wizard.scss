@@ -3,3 +3,7 @@
     height: #{$euiSizeXL};
   }
 }
+
+.test-container {
+  will-change: opacity;
+}

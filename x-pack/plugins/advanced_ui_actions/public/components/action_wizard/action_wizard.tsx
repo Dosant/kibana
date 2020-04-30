@@ -65,31 +65,31 @@ export const ActionWizard: React.FC<ActionWizardProps> = ({
     onActionFactoryChange(actionFactories[0]);
   }
 
-  if (currentActionFactory && config) {
-    return (
-      <SelectedActionFactory
-        actionFactory={currentActionFactory}
-        showDeselect={actionFactories.length > 1}
-        onDeselect={() => {
-          onActionFactoryChange(null);
-        }}
-        context={context}
-        config={config}
-        onConfigChange={newConfig => {
-          onConfigChange(newConfig);
-        }}
-      />
-    );
-  }
-
   return (
-    <ActionFactorySelector
-      context={context}
-      actionFactories={actionFactories}
-      onActionFactorySelected={actionFactory => {
-        onActionFactoryChange(actionFactory);
-      }}
-    />
+    <div className={'test-container'}>
+      {currentActionFactory && config ? (
+        <SelectedActionFactory
+          actionFactory={currentActionFactory}
+          showDeselect={actionFactories.length > 1}
+          onDeselect={() => {
+            onActionFactoryChange(null);
+          }}
+          context={context}
+          config={config}
+          onConfigChange={newConfig => {
+            onConfigChange(newConfig);
+          }}
+        />
+      ) : (
+        <ActionFactorySelector
+          context={context}
+          actionFactories={actionFactories}
+          onActionFactorySelected={actionFactory => {
+            onActionFactoryChange(actionFactory);
+          }}
+        />
+      )}
+    </div>
   );
 };
 
