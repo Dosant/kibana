@@ -17,8 +17,9 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
-import { EmbeddableInput, IEmbeddable } from './i_embeddable';
+import { Subscription } from 'rxjs';
+import React, { useEffect, useImperativeHandle, useState } from 'react';
+import { EmbeddableInput, EmbeddableOutput, IEmbeddable } from './i_embeddable';
 import { EmbeddableRoot } from './embeddable_root';
 import { EmbeddableFactory } from './embeddable_factory';
 import { ErrorEmbeddable } from './error_embeddable';
@@ -26,88 +27,114 @@ import { ErrorEmbeddable } from './error_embeddable';
 /**
  * This type is needed for strict, one of, public api
  */
-export type EmeddableRendererProps<I extends EmbeddableInput> =
-  | { input: I; onInputUpdated?: (newInput: I) => void; factory: EmbeddableFactory<I> }
-  | { input: I; onInputUpdated?: (newInput: I) => void; embeddable: IEmbeddable<I> };
+export type EmeddableRendererProps<
+  I extends EmbeddableInput,
+  O extends EmbeddableOutput,
+  E extends IEmbeddable<I, O>
+> = {
+  input: I;
+  onInputUpdated?: (newInput: I) => void;
+} & ({ factory: EmbeddableFactory<I, O, E> } | { embeddable: E });
 
 /**
  * This one is for internal implementation
  */
-interface InnerProps {
-  input: EmbeddableInput;
-  onInputUpdated?: (newInput: EmbeddableInput) => void;
-  factory?: EmbeddableFactory;
-  embeddable?: IEmbeddable;
+interface InnerProps<
+  I extends EmbeddableInput,
+  O extends EmbeddableOutput,
+  E extends IEmbeddable<I, O>
+> {
+  input: I;
+  onInputUpdated?: (newInput: I) => void;
+  factory?: EmbeddableFactory<I, O, E>;
+  embeddable?: E;
 }
 
-export const EmbeddableRenderer = <I extends EmbeddableInput>(
-  publicProps: EmeddableRendererProps<I>
-) => {
-  const props = publicProps as InnerProps;
-  const [embeddable, setEmbeddable] = useState<IEmbeddable | undefined>(props.embeddable);
-  const [loading, setLoading] = useState<boolean>(!props.embeddable);
-  const [error, setError] = useState<string | undefined>();
-  const latestInput = React.useRef(props.input);
-  useEffect(() => {
-    latestInput.current = props.input;
-  }, [props.input]);
+export const EmbeddableRenderer = React.forwardRef(
+  <
+    I extends EmbeddableInput = EmbeddableInput,
+    O extends EmbeddableOutput = EmbeddableOutput,
+    E extends IEmbeddable<I, O> = IEmbeddable<I, O>
+  >(
+    publicProps: EmeddableRendererProps<I, O, E>,
+    // TODO: ref could be ErrorEmbeddable,
+    // TODO: result type for E is not ideal here
+    ref: React.Ref<E | undefined>
+  ) => {
+    const props = publicProps as InnerProps<I, O, E>;
+    const [embeddable, setEmbeddable] = useState<E | undefined>(props.embeddable);
+    const [loading, setLoading] = useState<boolean>(!props.embeddable);
+    const [error, setError] = useState<string | undefined>();
+    const latestInput = React.useRef(props.input);
+    useEffect(() => {
+      latestInput.current = props.input;
+    }, [props.input]);
 
-  useEffect(() => {
-    let canceled = false;
-    if (props.embeddable) {
-      setEmbeddable(props.embeddable);
-      return;
-    }
+    const embeddableRef = React.useRef<E | undefined>(embeddable);
+    useEffect(() => {
+      embeddableRef.current = embeddable;
+    }, [embeddable]);
 
-    // keeping track of embeddables created by this component to be able to destroy them
-    let createdEmbeddableRef: IEmbeddable | ErrorEmbeddable | undefined;
-    if (props.factory) {
-      setEmbeddable(undefined);
-      setLoading(true);
-      props.factory
-        .create(latestInput.current)
-        .then((createdEmbeddable) => {
-          if (canceled) {
-            if (createdEmbeddable) {
-              createdEmbeddable.destroy();
+    useImperativeHandle(ref, () => embeddableRef.current);
+
+    useEffect(() => {
+      let canceled = false;
+      if (props.embeddable) {
+        setEmbeddable(props.embeddable);
+        return;
+      }
+
+      // keeping track of embeddables created by this component to be able to destroy them
+      let createdEmbeddableRef: IEmbeddable | ErrorEmbeddable | undefined;
+      if (props.factory) {
+        setEmbeddable(undefined);
+        setLoading(true);
+        props.factory
+          .create(latestInput.current)
+          .then((createdEmbeddable) => {
+            if (canceled) {
+              if (createdEmbeddable) {
+                createdEmbeddable.destroy();
+              }
             }
-          }
-          createdEmbeddableRef = createdEmbeddable;
-          setEmbeddable(createdEmbeddable);
-        })
-        .catch((err) => {
-          if (canceled) return;
-          setError(err?.message);
-        })
-        .finally(() => {
-          if (canceled) return;
-          setLoading(false);
-        });
-    }
-
-    return () => {
-      canceled = true;
-      if (createdEmbeddableRef) {
-        createdEmbeddableRef.destroy();
+            createdEmbeddableRef = createdEmbeddable;
+            setEmbeddable(createdEmbeddable as E); // TODO: ref could be ErrorEmbeddable
+          })
+          .catch((err) => {
+            if (canceled) return;
+            setError(err?.message);
+          })
+          .finally(() => {
+            if (canceled) return;
+            setLoading(false);
+          });
       }
-    };
-  }, [props.factory, props.embeddable]);
 
-  const { onInputUpdated } = props;
-  useEffect(() => {
-    const sub = embeddable?.getInput$().subscribe((input) => {
+      return () => {
+        canceled = true;
+        if (createdEmbeddableRef) {
+          createdEmbeddableRef.destroy();
+        }
+      };
+    }, [props.factory, props.embeddable]);
+
+    const { onInputUpdated } = props;
+    useEffect(() => {
+      let sub: Subscription | undefined;
       if (onInputUpdated) {
-        onInputUpdated(input);
+        sub = embeddable?.getInput$().subscribe((input) => {
+          onInputUpdated(input);
+        });
       }
-    });
-    return () => {
-      if (sub) {
-        sub.unsubscribe();
-      }
-    };
-  }, [embeddable, onInputUpdated]);
+      return () => {
+        if (sub) {
+          sub.unsubscribe();
+        }
+      };
+    }, [embeddable, onInputUpdated]);
 
-  return (
-    <EmbeddableRoot embeddable={embeddable} loading={loading} error={error} input={props.input} />
-  );
-};
+    return (
+      <EmbeddableRoot embeddable={embeddable} loading={loading} error={error} input={props.input} />
+    );
+  }
+);

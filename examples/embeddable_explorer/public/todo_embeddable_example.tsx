@@ -34,7 +34,7 @@ import {
   EuiTextArea,
   EuiTitle,
 } from '@elastic/eui';
-import { TodoInput } from '../../../examples/embeddable_examples/public/todo';
+import { TodoEmbeddable, TodoInput } from '../../../examples/embeddable_examples/public/todo';
 import { TodoEmbeddableFactory } from '../../../examples/embeddable_examples/public';
 import { EmbeddableRenderer } from '../../../src/plugins/embeddable/public';
 
@@ -50,24 +50,32 @@ interface State {
   input: TodoInput;
 }
 
+const initialInput: TodoInput = {
+  id: '1',
+  task: 'Take out the trash',
+  icon: 'broom',
+  title: 'Trash',
+};
+
 export class TodoEmbeddableExample extends React.Component<Props, State> {
+  private embeddableRef = React.createRef<TodoEmbeddable>();
+
   constructor(props: Props) {
     super(props);
 
     this.state = {
       loading: true,
-      input: {
-        id: '1',
-        task: 'Take out the trash',
-        icon: 'broom',
-        title: 'Trash',
-      },
+      input: initialInput,
     };
   }
 
   private onUpdateEmbeddableInput = () => {
     const { task, title, icon, input } = this.state;
     this.setState({ input: { ...input, task: task ?? '', title, icon } });
+
+    if (this.embeddableRef.current) {
+      this.embeddableRef.current.updateInput({ task: task ?? '', title, icon });
+    }
   };
 
   public render() {
@@ -128,6 +136,13 @@ export class TodoEmbeddableExample extends React.Component<Props, State> {
               <EmbeddableRenderer
                 factory={this.props.todoEmbeddableFactory}
                 input={this.state.input}
+              />
+            </EuiPanel>
+            <EuiPanel data-test-subj="todoEmbeddableImperative" paddingSize="none" role="figure">
+              <EmbeddableRenderer
+                factory={this.props.todoEmbeddableFactory}
+                input={initialInput}
+                ref={this.embeddableRef}
               />
             </EuiPanel>
           </EuiPageContentBody>
