@@ -33,7 +33,9 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
           },
           kibana: [
             {
-              base: ['all'],
+              feature: {
+                dashboard: ['minimal_read', 'store_search_session'],
+              },
               spaces: ['another-space'],
             },
           ],
@@ -53,6 +55,9 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
       });
 
       after(async () => {
+        await security.role.delete('data_analyst');
+        await security.user.delete('analyst');
+
         await esArchiver.unload('dashboard/session_in_space');
         await PageObjects.security.forceLogout();
       });
