@@ -108,6 +108,7 @@ export class DataPublicPlugin
     const queryService = this.queryService.setup({
       uiSettings: core.uiSettings,
       storage: this.storage,
+      nowProvider: this.nowProvider,
     });
 
     uiActions.registerTrigger(applyFilterTrigger);
