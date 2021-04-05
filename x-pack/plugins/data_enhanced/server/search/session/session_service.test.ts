@@ -62,27 +62,26 @@ describe('SearchSessionService', () => {
     references: [],
   };
 
+  const config: ConfigSchema = {
+    search: {
+      sessions: {
+        enabled: true,
+        pageSize: 10000,
+        notTouchedInProgressTimeout: moment.duration(1, 'm'),
+        notTouchedTimeout: moment.duration(2, 'm'),
+        maxUpdateRetries: MAX_UPDATE_RETRIES,
+        defaultExpiration: moment.duration(7, 'd'),
+        trackingInterval: moment.duration(10, 's'),
+        management: {} as any,
+      },
+    },
+  };
+
+  const mockLogger = coreMock.createPluginInitializerContext().logger.get();
+
   beforeEach(async () => {
     savedObjectsClient = savedObjectsClientMock.create();
-    const config: ConfigSchema = {
-      search: {
-        sessions: {
-          enabled: true,
-          pageSize: 10000,
-          notTouchedInProgressTimeout: moment.duration(1, 'm'),
-          notTouchedTimeout: moment.duration(2, 'm'),
-          maxUpdateRetries: MAX_UPDATE_RETRIES,
-          defaultExpiration: moment.duration(7, 'd'),
-          trackingInterval: moment.duration(10, 's'),
-          management: {} as any,
-        },
-      },
-    };
-    const mockLogger: any = {
-      debug: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    };
+
     service = new SearchSessionService(mockLogger, config);
     const coreStart = coreMock.createStart();
     const mockTaskManager = taskManagerMock.createStart();
@@ -765,6 +764,45 @@ describe('SearchSessionService', () => {
       expect(callAttributes).toHaveProperty('touched');
       expect(callAttributes).toHaveProperty('sessionId', sessionId);
       expect(callAttributes).toHaveProperty('persisted', false);
+    });
+
+    it("doesn't create the saved object, if search sessions disabled", async () => {
+      const sessionServiceWithDisabledSessions = new SearchSessionService(mockLogger, {
+        ...config,
+        search: {
+          ...config.search,
+          sessions: {
+            ...config.search.sessions,
+            enabled: false,
+          },
+        },
+      });
+      const searchRequest = { params: {} };
+      const searchId = 'FnpFYlBpeXdCUTMyZXhCLTc1TWFKX0EbdDFDTzJzTE1Sck9PVTBIcW1iU05CZzo4MDA0';
+
+      const mockCreatedSavedObject = {
+        ...mockSavedObject,
+        attributes: {},
+      };
+
+      savedObjectsClient.update.mockRejectedValue(
+        SavedObjectsErrorHelpers.createGenericNotFoundError(sessionId)
+      );
+      savedObjectsClient.create.mockResolvedValue(mockCreatedSavedObject);
+
+      await sessionServiceWithDisabledSessions.trackId(
+        { savedObjectsClient },
+        mockUser1,
+        searchRequest,
+        searchId,
+        {
+          sessionId,
+          strategy: MOCK_STRATEGY,
+        }
+      );
+
+      expect(savedObjectsClient.update).not.toHaveBeenCalled();
+      expect(savedObjectsClient.create).not.toHaveBeenCalled();
     });
 
     it('retries updating if update returned 404 and then update returned conflict 409 (first create race condition)', async () => {
