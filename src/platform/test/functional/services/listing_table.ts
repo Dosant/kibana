@@ -28,6 +28,7 @@ const PREFIX_MAP = {
 const TOOLBAR_SUBJECTS = getContentListToolbarSubjects();
 const CONTENT_LIST_TABLE = CONTENT_LIST_TEST_SUBJECTS.table;
 const CONTENT_LIST_TABLE_SKELETON = CONTENT_LIST_TEST_SUBJECTS.tableSkeleton;
+const CONTENT_LIST_TABLE_LOADING = `[data-test-subj="${CONTENT_LIST_TABLE}"].euiBasicTable-loading`;
 const CONTENT_LIST_ITEM_LINK = CONTENT_LIST_TEST_SUBJECTS.itemLink;
 const CONTENT_LIST_SEARCH_BOX = TOOLBAR_SUBJECTS.searchBox;
 const CONTENT_LIST_TAGS_FILTER_BUTTON = CONTENT_LIST_TEST_SUBJECTS.tagsFilter;
@@ -127,11 +128,31 @@ export class ListingTableService extends FtrService {
       if (await this.testSubjects.exists('listingTable-isLoaded', { timeout: 1000 })) {
         return true;
       }
-      // Content List keeps its table mounted behind a loading skeleton.
       if (await this.testSubjects.exists(CONTENT_LIST_TABLE, { timeout: 1000 })) {
-        if (!(await this.testSubjects.exists(CONTENT_LIST_TABLE_SKELETON, { timeout: 1000 }))) {
+        const hasLoadingSkeleton = await this.testSubjects.exists(CONTENT_LIST_TABLE_SKELETON, {
+          timeout: 1000,
+        });
+        const isTableLoading = await this.find.existsByDisplayedByCssSelector(
+          CONTENT_LIST_TABLE_LOADING
+        );
+        if (!hasLoadingSkeleton && !isTableLoading) {
           return true;
         }
+      }
+      throw new Error('Waiting');
+    });
+  }
+
+  private async waitUntilTableIsLoading() {
+    await this.retry.try(async () => {
+      if (await this.testSubjects.exists('listingTable-isLoading', { timeout: 1000 })) {
+        return true;
+      }
+      if (await this.testSubjects.exists(CONTENT_LIST_TABLE_SKELETON, { timeout: 1000 })) {
+        return true;
+      }
+      if (await this.find.existsByDisplayedByCssSelector(CONTENT_LIST_TABLE_LOADING)) {
+        return true;
       }
       throw new Error('Waiting');
     });
@@ -322,6 +343,7 @@ export class ListingTableService extends FtrService {
       }
     });
 
+    await this.waitUntilTableIsLoading();
     await this.waitUntilTableIsLoaded();
   }
 
