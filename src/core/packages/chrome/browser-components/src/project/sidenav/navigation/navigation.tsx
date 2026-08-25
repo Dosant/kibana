@@ -8,7 +8,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { map } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, switchMap } from 'rxjs';
 import { Navigation as NavigationComponent } from '@kbn/ui-side-navigation';
 import classnames from 'classnames';
 import type { SolutionId } from '@kbn/core-chrome-browser';
@@ -19,6 +19,11 @@ import { useIsNextChrome } from '@kbn/core-chrome-browser-hooks';
 import { useBasePath } from '../../../shared/chrome_hooks';
 import type { NavigationItems } from './to_navigation_items';
 import { toNavigationItems } from './to_navigation_items';
+import {
+  attachPopoverSections,
+  findActivePopoverItemId,
+  resolveLinksContent,
+} from './resolve_navigation_content';
 import { PanelStateManager } from './panel_state_manager';
 
 export interface ChromeNavigationProps {
@@ -66,17 +71,41 @@ const useNavigationItems = (): (NavigationItems & { solutionId: SolutionId }) | 
 
   const items$ = useMemo(() => {
     const panelStateManager = new PanelStateManager(basePath.get());
-    return chrome.project.getNavigation$().pipe(
-      map((nav) => ({
-        ...toNavigationItems(
-          nav.navigationTree,
-          nav.activeNodes,
-          nav.overflowItemIds,
-          panelStateManager,
-          isNextChrome
-        ),
-        solutionId: nav.solutionId,
-      }))
+    const navigation$ = chrome.project.getNavigation$();
+    const registeredContent$ = chrome.project.getRegisteredNavigationContent$();
+
+    const tree$ = navigation$.pipe(
+      map(({ navigationTree }) => navigationTree),
+      distinctUntilChanged()
+    );
+
+    const resolvedContent$ = combineLatest([
+      tree$,
+      registeredContent$.pipe(distinctUntilChanged()),
+    ]).pipe(switchMap(([tree, contents]) => resolveLinksContent(tree, contents)));
+
+    return combineLatest([navigation$, resolvedContent$]).pipe(
+      map(([nav, resolved]) => {
+        const items = attachPopoverSections(
+          toNavigationItems(
+            nav.navigationTree,
+            nav.activeNodes,
+            nav.overflowItemIds,
+            panelStateManager,
+            isNextChrome
+          ),
+          resolved
+        );
+        const popoverActiveId = findActivePopoverItemId(
+          resolved,
+          `${window.location.pathname}${window.location.hash}`
+        );
+        return {
+          ...items,
+          activeItemId: popoverActiveId ?? items.activeItemId,
+          solutionId: nav.solutionId,
+        };
+      })
     );
   }, [chrome, basePath, isNextChrome]);
 
